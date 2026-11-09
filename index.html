@@ -669,8 +669,14 @@ const INITS = (() => {
     const mint = mints[0], e = moved[mint];
     if (e.created) lam += RENT; if (e.closed) lam -= RENT;
     const sol = lam / 1e9;
-    if (e.d > 0 && sol < -0.0005) return { t: tx.blockTime, mint, side: "buy", tokens: e.d, sol: -sol, sig };
-    if (e.d < 0 && sol > 0.0005) return { t: tx.blockTime, mint, side: "sell", tokens: -e.d, sol, sig };
+    // the venue: owner of the token account that moved the other way (a pump.fun bonding curve, a PumpSwap pool…)
+    const other = {};
+    for (const b of tx.meta.preTokenBalances || []) if (b.mint === mint && b.owner && b.owner !== wallet) other[b.accountIndex] = { owner: b.owner, pre: Number(b.uiTokenAmount.amount), post: 0 };
+    for (const b of tx.meta.postTokenBalances || []) if (b.mint === mint && b.owner && b.owner !== wallet) { const o = other[b.accountIndex] || (other[b.accountIndex] = { owner: b.owner, pre: 0 }); o.post = Number(b.uiTokenAmount.amount); }
+    let venue = null, best = 0;
+    for (const o of Object.values(other)) { const d = o.post - o.pre; if (d && Math.sign(d) === -Math.sign(e.d) && Math.abs(d) > best) { best = Math.abs(d); venue = o.owner; } }
+    if (e.d > 0 && sol < -0.0005) return { t: tx.blockTime, mint, side: "buy", tokens: e.d, sol: -sol, sig, venue };
+    if (e.d < 0 && sol > 0.0005) return { t: tx.blockTime, mint, side: "sell", tokens: -e.d, sol, sig, venue };
     return null;
   }
 
@@ -803,14 +809,21 @@ const INITS = (() => {
       const p = top[i], meta = info[p.mint] || { symbol: p.mint.slice(0, 4), pools: [] }, sym = (meta.symbol || "?").toUpperCase();
       say("px", `pricing ${i + 1}/${top.length} · $${sym}`, i === top.length - 1);
       const to = p.open ? now : p.t1, row = { mint: p.mint, sym, pos: p, candles: [], last: 0, sec: 60 };
+      const uniq = a => [...new Set(a.filter(Boolean))];
+      const venues = uniq(p.trades.map(t => t.venue)), tops = meta.pools || [];
+      const cands = uniq([...venues, ...tops]).slice(0, 3), tried = new Set();
       try {
-        for (const [k, addr] of meta.pools.slice(0, 2).entries()) {
+        for (const addr of cands) {
+          tried.add(addr);
           const c = await candlesFor(gt, addr, p.mint, p.t0, to);
-          if (k === 0) { row.sec = c.sec; row.last = c.list.length ? c.list[c.list.length - 1].c : 0; }
-          row.candles = row.candles.concat(c.list);
-          if (!c.list.length || c.list[0].s <= p.t0 + c.sec) break;   // this pool covers the first buy: done
+          if (c.list.length) { if (!row.candles.length) row.sec = c.sec; row.candles = row.candles.concat(c.list); }
+          const first = row.candles.length ? Math.min(...row.candles.map(x => x.s)) : Infinity;
+          const startOK = first <= p.t0 + row.sec;                                      // covers the first buy
+          const endOK = !p.open || tops.includes(addr) || !tops.some(a => !tried.has(a)); // open bag: also want the live pool
+          if (startOK && endOK) break;
         }
         row.candles.sort((a, b) => a.s - b.s);
+        row.last = row.candles.length ? row.candles[row.candles.length - 1].c : 0;
       } catch (e) { row.err = e.message; }
       if (!row.candles.length) row.err ||= "no chart";
       priced.push(row);
