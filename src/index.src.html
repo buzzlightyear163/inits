@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en" data-theme="ledger">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>INITS — takes your initials. every time.</title>
+<meta name="description" content="Sells your initials at 2x on everything you buy, so you never round-trip again. Paste a wallet to see how much SOL you gave back.">
+<meta name="theme-color" content="#0f241a">
+<meta property="og:title" content="INITS — takes your initials. every time."><meta property="og:description" content="Paste a wallet. See how much SOL you gave back by not taking your initials at 2x.">
+<meta property="og:type" content="website"><meta property="og:image" content="/og.png">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="/og.png">
+<link rel="icon" href="/fav.png"><link rel="apple-touch-icon" href="/fav.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+/* ===== session layout: the page is one terminal session. sticky command rail left, output right. ===== */
+:root{--w:1200px}
+body::before{opacity:.22}
+.top{background:color-mix(in srgb,var(--bg) 82%,transparent)} .top .wrap{height:64px}
+.top .live{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);margin-left:auto}
+.nav{margin:0 0 0 40px}
+.dot{width:7px;height:7px;background:var(--faint);display:inline-block;flex:none}
+.dot.on{background:var(--accent);box-shadow:var(--glow);animation:blink 1.6s steps(1) infinite} .dot.red{background:var(--red)}
+.k{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);min-height:1.6em;margin-top:10px} .hint.err{color:var(--red)}
+/* hero: the product starts here */
+.hero2{position:relative;min-height:calc(100svh - 64px);display:flex;align-items:center;overflow:hidden;padding:40px 0 90px}
+.hero2 canvas.bg{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.hero2 .wrap{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:40px;align-items:center;width:100%}
+.hero2 h1{font-size:clamp(50px,7.6vw,108px);font-weight:400;letter-spacing:-.055em;line-height:.94;margin:28px 0 26px}
+.hero2 h1 b{font-weight:700}
+.hero2 .lede{color:var(--muted);font-size:16px;max-width:42ch;line-height:1.65}
+.hero2 .lede b{color:var(--ink);font-weight:500}
+.inbar{display:flex;border:1.5px solid var(--line);background:var(--paper);height:58px;max-width:580px;box-shadow:6px 6px 0 var(--shadow);transition:border-color .15s}
+.inbar:focus-within{border-color:var(--accent)}
+.inbar input{flex:1;background:none;border:0;padding:0 18px;font:14px var(--mono);color:var(--ink);outline:none;min-width:0}
+.inbar input::placeholder{color:var(--faint)}
+.inbar button{border:0;background:var(--accent);color:var(--bg);font:600 13.5px var(--mono);padding:0 24px;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:var(--glow)}
+.inbar button[disabled]{opacity:.6;cursor:progress}
+.hero2 .inbar{margin-top:36px}
+.try{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-top:16px;font-size:12px;color:var(--muted);min-height:26px}
+.try .chip{border:1px solid var(--hair);color:var(--ink)} .try .chip small{color:var(--muted);margin-left:.45em}
+.liveline{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);margin-top:30px;padding-top:18px;border-top:1px solid var(--hair);max-width:580px}
+.liveline b{color:var(--ink);font-weight:500}
+.statusrow{position:absolute;left:0;right:0;bottom:26px;z-index:1}
+.statusrow .wrap{display:flex !important;gap:28px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.statusrow span{display:inline-flex;align-items:center;gap:8px}
+.statusrow .ca{margin:0 0 0 auto;font-size:11px;letter-spacing:.04em;text-transform:none}
+/* sessions */
+.sess{position:relative;z-index:1;border-top:1px solid var(--hair)}
+.sess>.wrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:72px;padding-top:120px;padding-bottom:120px}
+.rail{position:sticky;top:110px;align-self:start}
+.rail .n{font-size:11px;letter-spacing:.16em;color:var(--faint);margin-bottom:14px}
+.rail .cmd{font-size:13px;color:var(--muted);white-space:nowrap} .rail .cmd b{color:var(--ink);font-weight:500}
+.rail h2{font-size:clamp(28px,3vw,38px);font-weight:500;letter-spacing:-.035em;line-height:1.08;margin:16px 0}
+.rail p{color:var(--muted);font-size:14px;line-height:1.7}
+.rail .ctl{margin-top:26px;padding-top:20px;border-top:1px solid var(--hair);display:flex;flex-direction:column;gap:14px}
+.rail .note{font-size:12px;color:var(--faint);line-height:1.6}
+.toggles{display:flex;flex-wrap:wrap;gap:6px} .toggles .chip{border:1px solid var(--hair)}
+.out{min-width:0}
+/* story: pinned, scroll-driven canvas. beats in the rail light up in order */
+.story{height:340vh}
+.story>.wrap{position:sticky;top:64px;height:calc(100svh - 64px);padding-top:0;padding-bottom:0;align-items:center}
+.story .rail{position:static}
+.beats{margin-top:26px;display:flex;flex-direction:column;gap:2px}
+.beats li{list-style:none;display:grid;grid-template-columns:2.2em 1fr;padding:10px 0;color:var(--faint);font-size:13.5px;line-height:1.55;transition:color .25s}
+.beats li b{font-weight:500} .beats li.done{color:var(--muted)} .beats li.on{color:var(--ink)} .beats li.on b{color:var(--accent);text-shadow:var(--glow)}
+.storybox{border:1px solid var(--hair);background:color-mix(in srgb,var(--paper) 55%,transparent);padding:18px 20px 16px}
+.storybox .hd{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:14px} .storybox .hd b{color:var(--ink);font-weight:500}
+#storyCv{display:block;width:100%;image-rendering:pixelated}
+/* receipt tool */
+.scanlog{margin-top:6px;font-size:12.5px;line-height:1.95;color:var(--muted)}
+.scanlog div::before{display:inline-block;width:1.6em}
+.scanlog .ok::before{content:"✓";color:var(--accent)} .scanlog .run::before{content:"›";color:var(--ink)} .scanlog .err{color:var(--red)} .scanlog .err::before{content:"✗"}
+.scanlog .run::after{content:"";display:inline-block;width:.5em;height:1em;background:var(--accent);vertical-align:-.15em;margin-left:.4em;animation:blink 1.1s steps(1) infinite}
+.receipt{margin-top:34px}
+.cardframe{border:1px solid var(--line);background:var(--paper);position:relative}
+#card{display:block;width:100%;height:auto}
+.acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.acts .say{font-size:12px;color:var(--muted);margin-left:6px}
+.sumline{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:22px;font-size:12.5px;color:var(--muted)} .sumline b{color:var(--ink);font-weight:500}
+/* lists, tables, numbers: hairlines, no cards */
+.listhd{display:flex;justify-content:space-between;gap:16px;margin-top:44px;font-size:11.5px;color:var(--muted)}
+.list{margin-top:12px;border-top:1px solid var(--hair)}
+.list .empty{padding:44px 0;color:var(--faint);font-size:13px;line-height:1.9}
+.lrow{display:grid;grid-template-columns:20px minmax(90px,1fr) minmax(130px,1.25fr) minmax(120px,auto);gap:16px;align-items:center;padding:15px 0 15px 14px;border-bottom:1px solid var(--hair);font-size:13px;position:relative}
+.lrow.sel::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:2px;background:var(--red)}
+.lrow .sym{font-weight:600;font-size:15px} .lrow .sym a{text-decoration:none} .lrow .sym a:hover{color:var(--accent)} .lrow .sub{color:var(--muted);font-size:11.5px}
+.lrow .d{text-align:right;font-weight:500} .lrow .d small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.bigstats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.bigstats>div{padding:22px 22px 24px 0} .bigstats>div+div{padding-left:22px;border-left:1px solid var(--hair)}
+.bigstats .v{font-size:clamp(30px,3.4vw,46px);font-weight:500;letter-spacing:-.04em;margin-top:10px;line-height:1}
+.feature{display:grid;grid-template-columns:auto 1fr auto;gap:8px 28px;align-items:end;padding:34px 0;border-bottom:1px solid var(--hair)}
+.feature .big{font-size:clamp(40px,5vw,68px);font-weight:600;letter-spacing:-.045em;line-height:.95}
+.feature .what{font-size:15px;line-height:1.6} .feature .what span{color:var(--muted)}
+.feature a{font-size:12px;color:var(--muted);text-decoration:none}
+.feature.wait{display:block;color:var(--faint);font-size:13px;line-height:1.8}
+.out .log{height:300px;margin-top:6px} .out .log div{border-bottom:1px solid color-mix(in srgb,var(--hair) 60%,transparent)}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);margin-top:44px}
+.facts>div{padding:18px 18px 20px 0} .facts>div+div{padding-left:18px;border-left:1px solid var(--hair)} .facts .v{font-size:18px;margin-top:8px}
+.callout{display:flex;align-items:center;gap:24px;justify-content:space-between;margin-top:44px;padding:26px 28px;border:1px solid var(--line);background:color-mix(in srgb,var(--paper) 70%,transparent)}
+.callout p{font-size:15px;line-height:1.6;max-width:46ch} .callout p span{color:var(--muted)}
+.out .split{margin-top:0} .out .man summary{padding:20px 0}
+footer.f2{position:relative;z-index:1;border-top:1px solid var(--hair);padding:120px 0 50px;overflow:hidden}
+footer.f2 .big{font-size:clamp(46px,9vw,140px);letter-spacing:-.06em;line-height:.9;font-weight:400} footer.f2 .big b{font-weight:700}
+footer.f2 .fine{display:flex;gap:24px;flex-wrap:wrap;margin-top:60px;font-size:12px;color:var(--muted);border-top:1px solid var(--hair);padding-top:20px}
+@media (max-width:980px){
+  .sess>.wrap{grid-template-columns:1fr;gap:34px;padding-top:84px;padding-bottom:84px} .rail{position:static}
+  .story{height:auto} .story>.wrap{position:static;height:auto;padding-top:84px;padding-bottom:84px}
+  .bigstats,.facts{grid-template-columns:1fr 1fr} .bigstats>div:nth-child(3),.facts>div:nth-child(3){padding-left:0;border-left:0}
+  .bigstats>div:nth-child(n+3),.facts>div:nth-child(n+3){border-top:1px solid var(--hair)}
+}
+@media (max-width:860px){
+  .hero2{min-height:0;padding:28px 0 130px} .hero2 .wrap{grid-template-columns:1fr;gap:0} .hero2 .vis{height:210px !important;order:-1} .hero2 h1{margin:20px 0}
+  .top .live{display:none} .top .btn{margin-left:auto}
+  .statusrow .wrap{flex-wrap:wrap;gap:8px 18px} .statusrow .ca{margin:0;width:100%}
+  .lrow{grid-template-columns:14px 1fr auto;padding-left:10px} .lrow .det{display:none} .feature{grid-template-columns:1fr} .callout{flex-direction:column;align-items:flex-start}
+  .inbar button span{display:none} .hero2 .prompt{font-size:12.5px} .listhd span+span{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top" id="top"><div class="wrap">
+  <a class="brand" href="#hero"><canvas id="logo"></canvas>inits</a>
+  <nav class="nav"><a href="#story">how</a><a href="#tool">receipt</a><a href="#live">watch</a><a href="#token">token</a><a href="#faq">faq</a></nav>
+  <span class="live"><i class="dot" id="topDot"></i><span id="topLive">connecting to pump.fun</span></span>
+  <a class="btn" id="buyTop" href="#token">buy</a>
+</div></header>
+
+<section class="hero2" id="hero">
+  <canvas class="bg" id="heroBg"></canvas>
+  <div class="wrap">
+    <div>
+      <div class="prompt"><span>anon@inits ~ %</span> <span class="cmd" id="typed"></span><span class="cur"></span></div>
+      <h1>takes your<br><b>initials.</b></h1>
+      <p class="lede"><b>Every time.</b> INITS sells your initials at 2x on everything you buy, so you never round-trip again. Paste a wallet to see what not taking them has cost you.</p>
+      <div class="inbar"><input id="hIn" placeholder="paste a wallet address" autocomplete="off" spellcheck="false" aria-label="wallet address"><button id="hGo">▶ <span>receipt</span></button></div>
+      <div class="hint" id="heroHint">read-only. an address, never a key.</div>
+      <div class="try"><span>or</span><button class="chip" id="trySample">see a sample receipt<small>preview</small></button></div>
+      <div class="liveline"><i class="dot" id="lineDot"></i><span id="liveline">connecting to the pump.fun feed…</span></div>
+    </div>
+    <div class="vis" id="heroVis" style="height:520px"></div>
+  </div>
+  <div class="statusrow"><div class="wrap"><span><i class="dot on"></i>receipts: live</span><span><i class="dot on"></i>2x watch: live</span><span><i class="dot"></i>auto-sell: preview</span><span class="ca">ca <code id="ca">posted here and on X at launch</code> <button class="chip" id="copy" hidden>copy</button></span></div></div>
+</section>
+
+<section class="sess story" id="story"><div class="wrap">
+  <div class="rail">
+    <div class="n">01</div>
+    <div class="cmd">anon@inits ~ % <b>inits --at 2x</b></div>
+    <h2>same chart, two wallets.</h2>
+    <p>One coin, one round-trip. Only one of the wallets took its initials.</p>
+    <ol class="beats" id="beats">
+      <li><b>01</b>You buy 1 SOL of a fresh launch.</li>
+      <li><b>02</b>It runs. 2x on your entry. Your 1 SOL is now 2.</li>
+      <li><b>03</b>INITS sells your 1 SOL back in that candle. The rest rides for free.</li>
+      <li><b>04</b>It round-trips to 0.6x. Holding, you're down 0.40. With INITS, you're up 0.30.</li>
+    </ol>
+  </div>
+  <div class="out"><div class="storybox"><div class="hd"><span>candle <b id="slotN">01</b> / 16</span><span class="tag">illustration</span></div><canvas id="storyCv"></canvas></div></div>
+</div></section>
+
+<section class="sess" id="tool"><div class="wrap">
+  <div class="rail">
+    <div class="n">02</div>
+    <div class="cmd">anon@inits ~ % <b>inits receipt</b> <span class="lamp live" id="toolLamp">live</span></div>
+    <h2>your receipt.</h2>
+    <p>Paste any wallet. INITS reads its recent trades, pulls each coin's chart and replays every buy with a 2x exit. You get a card with the number.</p>
+    <div class="ctl">
+      <div class="k">scan depth</div><div class="toggles" id="depthT"><button class="chip" data-v="100">100 tx</button><button class="chip on" data-v="250">250 tx</button><button class="chip" data-v="500">500 tx</button></div>
+      <div class="k">take initials at</div><div class="toggles" id="thrT"><button class="chip" data-v="1.5">1.5x</button><button class="chip on" data-v="2">2x</button><button class="chip" data-v="3">3x</button><button class="chip" data-v="5">5x</button></div>
+      <div class="note">Public chain data only. Nothing to connect, nothing to sign. The 12 biggest coins by SOL in get priced.</div>
+    </div>
+  </div>
+  <div class="out">
+    <div class="inbar" style="max-width:none;box-shadow:none"><input id="tIn" placeholder="paste a wallet address" autocomplete="off" spellcheck="false" aria-label="wallet address"><button id="tGo">▶ <span>receipt</span></button></div>
+    <div class="hint" id="toolHint"></div>
+    <div class="scanlog" id="scanlog"></div>
+    <div class="receipt" id="receipt" hidden>
+      <div class="cardframe"><canvas id="card" width="2400" height="1350"></canvas></div>
+      <div class="acts">
+        <button class="btn pri" id="dl">download png</button><button class="btn" id="cp">copy image</button><a class="btn" id="post" target="_blank" rel="noopener">post on X</a>
+        <span class="say" id="say"></span>
+      </div>
+      <div class="sumline" id="sumline"></div>
+    </div>
+    <div class="listhd" id="listhd" hidden><span id="listT">coins · biggest first</span><span>with inits vs what you did</span></div>
+    <div class="list" id="list"><div class="empty">no receipt yet. paste a wallet above, or open the sample.<br><span class="acc">inits receipt --wallet &lt;address&gt;</span></div></div>
+  </div>
+</div></section>
+
+<section class="sess" id="live"><div class="wrap">
+  <div class="rail">
+    <div class="n">03</div>
+    <div class="cmd">anon@inits ~ % <b>inits watch</b></div>
+    <h2>the bags you still hold.</h2>
+    <p>After a receipt, your open bags stay on watch, priced every 15 seconds. The moment one crosses 2x on your entry, it says so. <span class="lamp" id="lamp">idle</span></p>
+    <div class="ctl"><div class="k">when a bag crosses 2x</div><div class="toggles"><button class="chip" id="sndT">sound</button><button class="chip" id="ntfT">notify</button></div>
+      <div class="note">The auto-sell engine that fires the sell for you is preview. Watch and alerts run for real.</div></div>
+  </div>
+  <div class="out">
+    <div class="bigstats">
+      <div><div class="k">pump.fun launches</div><div class="v" id="sA">0</div></div>
+      <div><div class="k">your open bags</div><div class="v" id="sB">–</div></div>
+      <div><div class="k">at 2x or more</div><div class="v acc" id="sC">–</div></div>
+      <div><div class="k">initials on table</div><div class="v" id="sD">–</div></div>
+    </div>
+    <div class="feature wait" id="feature">get a receipt above and your open bags land here.<br>until then: every coin launched on pump.fun since you opened this page.</div>
+    <div class="log" id="log"></div>
+  </div>
+</div></section>
+
+<section class="sess" id="token"><div class="wrap">
+  <div class="rail">
+    <div class="n">04</div>
+    <div class="cmd">anon@inits ~ % <b>inits token</b></div>
+    <h2>fees keep it honest.</h2>
+    <p>Creator fees pay for the data and the sell engine. Every SOL of fees splits the same way.</p>
+    <div class="ctl"><div class="ctas" style="margin-top:0"><a class="btn pri" id="buy" href="#">buy on pump.fun</a><a class="btn" id="xlink" href="#">follow on X</a></div></div>
+  </div>
+  <div class="out">
+    <div class="split"><div style="flex:50;--c:var(--accent)"></div><div style="flex:40;--c:var(--red)"></div><div style="flex:10;--c:var(--faint)"></div></div>
+    <div class="rows"><div><b class="acc">50%</b>rpc, chart data and the sell engine</div><div><b class="red">40%</b>buyback + burn $INITS</div><div><b>10%</b>dev</div></div>
+    <div class="facts">
+      <div><div class="k">ticker</div><div class="v">$INITS</div></div><div><div class="k">chain</div><div class="v">solana</div></div>
+      <div><div class="k">launch</div><div class="v">pump.fun</div></div><div><div class="k">trigger</div><div class="v acc">2x</div></div>
+    </div>
+    <div class="callout"><p>INITS never touches a key. <span>Receipts read public chain data, the watch reads public prices. Paste an address, never a seed.</span></p><button class="btn pri" id="toTool">get your receipt</button></div>
+  </div>
+</div></section>
+
+<section class="sess" id="faq"><div class="wrap">
+  <div class="rail">
+    <div class="n">05</div>
+    <div class="cmd">anon@inits ~ % <b>man inits</b></div>
+    <h2>the fine print.</h2>
+    <p>What's live, what's preview, how the number is counted, and what INITS will never ask you for.</p>
+  </div>
+  <div class="out"><div class="man">
+    <details open><summary>is this financial advice?</summary><p>No. A receipt shows what already happened. Taking initials at 2x is a rule, not a prediction: on a coin that keeps running, it costs you, and the receipt shows that too.</p></details>
+    <details><summary>what's live and what's preview?</summary><p>Receipts and the 2x watch are live and read real chain and chart data. The auto-sell engine that places the sell for you is preview.</p></details>
+    <details><summary>how is "gave back" counted?</summary><p>Every buy is replayed on its coin's chart. The first candle after the buy whose high reaches 2x that buy's price sells enough to return the SOL you put in. Your own sells are mirrored on what's left. "Gave back" adds up every coin where that beats what you actually got, plus what you still hold at today's price. Coins where you did better yourself are counted separately, so the net is on the card.</p></details>
+    <details><summary>why only the last trades and 12 coins?</summary><p>It runs on free public data with rate limits, so it reads up to 500 recent transactions and prices the 12 coins you put the most SOL into. Fees, priority tips and slippage are in your entry, so the number leans conservative.</p></details>
+    <details><summary>do I need to connect a wallet?</summary><p>No. Paste any address. Never paste a seed phrase or private key anywhere, here or elsewhere.</p></details>
+    <details><summary>will inits DM me?</summary><p>Never. Anyone who does is not us.</p></details>
+  </div></div>
+</div></section>
+
+<footer class="f2"><div class="wrap">
+  <div class="big">take your<br><b>initials.</b><span class="cur"></span></div>
+  <div class="ctas" style="margin-top:40px"><a class="btn pri" href="#tool">get your receipt</a></div>
+  <div class="fine"><span>$INITS · solana</span><span>not financial advice</span><span id="cafoot"></span></div>
+</div></footer>
+
+<script src="termkit.js"></script>
+<script src="engine.js"></script>
+<script>
+const CONFIG = {
+  ca: "", x: "https://x.com/", site: "", ticker: "$INITS", object: "split", theme: document.documentElement.dataset.theme,
+  rpc: ["https://solana-rpc.publicnode.com", "https://api.mainnet-beta.solana.com"], maxCoins: 12,
+};
+const T = TK.THEMES[CONFIG.theme], reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+const hhmmss = () => new Date().toTimeString().slice(0, 8);
+const short = a => a ? a.slice(0, 4) + "…" + a.slice(-4) : "";
+const solf = n => { const a = Math.abs(n); return a.toFixed(a > 0 && a < .01 ? 3 : 2); };
+const signed = n => (n > 0.0005 ? "+" : n < -0.0005 ? "−" : "") + solf(n);
+const mult = n => (n >= 10 ? n.toFixed(0) : n.toFixed(1)) + "x";
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const host = () => (CONFIG.site || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+if (CONFIG.ca) { $("#ca").textContent = CONFIG.ca; $("#copy").hidden = false; $("#cafoot").textContent = "ca " + CONFIG.ca;
+  $("#copy").onclick = () => navigator.clipboard.writeText(CONFIG.ca).then(() => $("#copy").textContent = "copied").catch(() => {});
+  ["#buy", "#buyTop"].forEach(s => $(s).href = "https://pump.fun/coin/" + CONFIG.ca); }
+else { $("#buy").removeAttribute("href"); $("#buy").textContent = "live at launch"; $("#buy").style.opacity = .6; }
+$("#xlink").href = CONFIG.x;
+
+{ const g = TK.OBJECTS[CONFIG.object]({ ticker: CONFIG.ticker }), c = $("#logo"), k = 2;
+  c.width = g.w * k; c.height = g.h * k; TK.draw(c.getContext("2d"), g, { theme: T, cell: k, x: 0, y: 0, shadow: false });
+  c.style.width = Math.round(26 * g.w / g.h) + "px"; }
+
+// hero: the object, big, its long shadow running off the page
+function drawHero() {
+  const hero = $("#hero"), c = $("#heroBg"), d = devicePixelRatio || 1, r = hero.getBoundingClientRect(), a = $("#heroVis").getBoundingClientRect();
+  c.width = r.width * d; c.height = r.height * d; const x = c.getContext("2d"); x.scale(d, d); x.imageSmoothingEnabled = false;
+  const g = TK.OBJECTS[CONFIG.object]({ ticker: CONFIG.ticker });
+  const cell = Math.max(4, Math.floor(Math.min(a.width * .78 / g.w, a.height * .78 / g.h)));
+  TK.draw(x, g, { theme: T, cell, x: a.left - r.left + (a.width - g.w * cell) * .5, y: a.top - r.top + (a.height - g.h * cell) * .4, shadowLen: 2200 });
+}
+drawHero(); addEventListener("resize", drawHero); document.fonts.ready.then(drawHero);
+{ const cmd = "inits receipt --wallet", el = $("#typed"); if (reduce) el.textContent = cmd;
+  else { let i = 0; const t = setInterval(() => { el.textContent = cmd.slice(0, ++i); if (i >= cmd.length) clearInterval(t); }, 70); } }
+
+// ---------- story: the same chart, two wallets ----------
+const STORY = { N: 16, price: [1, .96, 1.08, 1.02, 1.22, 1.38, 1.62, 1.86, 2.08, 2.31, 2.12, 1.66, 1.18, .84, .7, .6], at: 8,
+  lanes: [{ name: "with inits", mark: "sell", from: .5, color: "accent", before: "armed at 2x", after: "1.00 SOL back · rest rides" },
+          { name: "you, holding", mark: "hold", from: .56, color: "red", before: "holding", after: "held · back to 0.6x" }],
+  link: "same candle", after: { from: .8, text: "+0.30 SOL", sub: "with inits · holding: −0.40", color: "accent" }, p: 0 };
+function drawStory() {
+  const c = $("#storyCv"), d = devicePixelRatio || 1, W = Math.round(c.parentElement.clientWidth - 40), H = Math.round(W < 600 ? W * .95 : Math.min(W * .62, innerHeight * .56));
+  if (c.width !== W * d || c.height !== H * d) { c.width = W * d; c.height = H * d; c.style.height = H + "px"; }
+  const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, W, H);
+  const S = STORY, p = S.p, N = S.N, cw = W / N, upto = Math.min(N, p * N * 1.25 + .6), F = (s, w = 400) => `${w} ${s}px "JetBrains Mono", monospace`;
+  const top = 26, lane = Math.min(cw * .62, 26), L = S.lanes.length, ph = H - top - L * (lane + 30) - 32, px = Math.max(2, Math.round(cw / 14));
+  const ys = S.lanes.map((_, i) => top + ph + 40 + i * (lane + 30)), col = k => T[k] || k;
+  const max = 3.0, min = .4, py = v => top + ph - (v - min) / (max - min) * ph;
+  for (let i = 0; i <= N; i++) { x.fillStyle = T.line; x.globalAlpha = i <= upto ? .07 : .035; x.fillRect(Math.round(i * cw), top - 10, 1, H - top + 4); } x.globalAlpha = 1;
+  // guide lines: entry and 2x
+  for (let X = 0; X < W; X += 9) { x.fillStyle = T.muted; x.globalAlpha = .55; x.fillRect(X, Math.round(py(1)), 3, 1.5); } x.globalAlpha = 1;
+  for (let X = 0; X < W; X += 18) { x.fillStyle = T.accent; x.fillRect(X, Math.round(py(2)), 10, 1.5); }
+  x.font = F(11); x.fillStyle = T.muted; x.textAlign = "right"; x.fillText("entry", W, py(1) - 7); x.textAlign = "left"; x.fillStyle = T.accent; x.fillText("2x on your entry", 0, py(2) - 7);
+  // price
+  for (let i = 0; i < Math.floor(upto); i++) { const v = S.price[i], pv = i ? S.price[i - 1] : v, X0 = Math.round(i * cw), X1 = Math.round((i + 1) * cw);
+    x.fillStyle = i < S.at ? T.muted : v < 1 ? T.red : T.ink;
+    for (let X = X0; X < X1; X += px * 1.5) x.fillRect(X, Math.round(py(v)), px, px);
+    for (let Y = Math.min(py(v), py(pv)); Y <= Math.max(py(v), py(pv)); Y += px * 1.5) x.fillRect(X0, Math.round(Y), px, px); }
+  x.font = F(11); x.fillStyle = T.muted; x.fillText("price", 0, top - 8);
+  // lanes
+  S.lanes.forEach((ln, r) => { const Y = ys[r], on = p > ln.from;
+    x.font = F(11); x.fillStyle = T.muted; x.textAlign = "left"; x.fillText(ln.name, 0, Y - 10);
+    x.textAlign = "right"; x.fillStyle = on ? col(ln.color) : T.muted; x.fillText(on ? ln.after : ln.before, W, Y - 10); x.textAlign = "left";
+    for (let i = 0; i < N; i++) { const X = i * cw + 3, w = cw - 6, seen = i < upto;
+      x.strokeStyle = T.line; x.globalAlpha = seen ? .5 : .15; x.strokeRect(Math.round(X) + .5, Math.round(Y) + .5, Math.round(w) - 1, lane - 1); x.globalAlpha = 1;
+      if (seen && i < S.at) { x.fillStyle = T.accent; x.globalAlpha = .08; x.fillRect(Math.round(X) + 2, Math.round(Y) + 2, Math.round(w) - 4, lane - 4); x.globalAlpha = 1; } }
+    if (on) { const X = S.at * cw + 3, w = cw - 6; x.fillStyle = col(ln.color); x.fillRect(Math.round(X), Y, Math.round(w), lane);
+      if (w >= 26) { x.fillStyle = T.bg; x.font = F(10, 600); x.textAlign = "center"; x.fillText(ln.mark, X + w / 2, Y + lane / 2 + 3.5); x.textAlign = "left"; } } });
+  const last = S.lanes[L - 1]; if (p > last.from) { const cx = Math.round(S.at * cw + cw / 2); x.fillStyle = T.accent;
+    for (let Y = py(2) + 8; Y < ys[L - 1] - 2; Y += 6) x.fillRect(cx, Y, 1, 3); x.font = F(11, 500); x.fillText(S.link, cx + 8, py(1) + 26); }
+  if (p > S.after.from) { const fs = Math.round(Math.max(20, Math.min(34, cw * 1.1))); x.textAlign = "right"; x.font = F(fs, 600); x.fillStyle = col(S.after.color);
+    const ly = top + fs + 6; x.fillText(S.after.text, W - 2, ly); x.font = F(11); x.fillStyle = T.muted; if (W >= 420) x.fillText(S.after.sub, W - 2, ly + 18); x.textAlign = "left"; }
+  $("#slotN").textContent = String(Math.min(N, Math.max(1, Math.ceil(upto)))).padStart(2, "0");
+}
+function storyScroll() { const s = $("#story"), r = s.getBoundingClientRect(), span = r.height - innerHeight;
+  STORY.p = innerWidth <= 980 ? 1 : span > 0 ? Math.min(1, Math.max(0, -r.top / span)) : 1; drawStory();
+  const n = Math.min(3, Math.floor(STORY.p * 4)); $$("#beats li").forEach((li, i) => { li.classList.toggle("on", i === n); li.classList.toggle("done", i < n); }); }
+addEventListener("scroll", () => requestAnimationFrame(storyScroll), { passive: true }); addEventListener("resize", () => { $("#storyCv").width = 0; storyScroll(); });
+document.fonts.ready.then(() => { $("#storyCv").width = 0; storyScroll(); }); storyScroll();
+
+// ---------- the receipt ----------
+let SCAN = null, SUM = null, THR = 2, DEPTH = 250, BUSY = false;
+function chips(sel, on) { $$(sel + " .chip").forEach(b => b.onclick = () => { $$(sel + " .chip").forEach(x => x.classList.toggle("on", x === b)); on(+b.dataset.v); }); }
+chips("#depthT", v => DEPTH = v);
+chips("#thrT", v => { THR = v; if (SCAN) render(); $$("[data-thr]").forEach(e => e.textContent = v + "x"); });
+
+const LOG = {};
+function say(key, msg, done, err) {
+  let el = LOG[key]; if (!el) { el = LOG[key] = document.createElement("div"); $("#scanlog").append(el); }
+  el.textContent = msg; el.className = err ? "err" : done ? "ok" : "run";
+}
+function friendly(e) {
+  const m = String(e && e.message || e);
+  if (/fetch|network|load failed|cors/i.test(m)) return "couldn't reach the public solana rpc. try again in a minute.";
+  if (/rate|429|busy/i.test(m)) return "the public rpc is busy right now. try again in a minute, or a smaller scan depth.";
+  if (/invalid param|WrongSize|Invalid/i.test(m)) return "that address didn't work. check it and try again.";
+  return m.slice(0, 120);
+}
+
+async function runScan(addr, hintSel) {
+  addr = (addr || "").trim(); const h = $(hintSel);
+  if (!INITS.isAddr(addr)) { h.textContent = "that doesn't look like a solana address."; h.classList.add("err"); return; }
+  if (BUSY) return; BUSY = true; h.classList.remove("err"); h.textContent = "";
+  $("#tIn").value = addr; if (hintSel === "#heroHint") { h.textContent = "reading the chain…"; $("#tool").scrollIntoView({ behavior: reduce ? "auto" : "smooth" }); }
+  $$("#hGo,#tGo").forEach(b => b.disabled = true);
+  $("#scanlog").innerHTML = ""; for (const k in LOG) delete LOG[k];
+  say("start", `inits receipt --wallet ${short(addr)} --depth ${DEPTH}`, true);
+  try {
+    const S = await INITS.scan(addr, { rpc: CONFIG.rpc, depth: DEPTH, maxCoins: CONFIG.maxCoins, concurrency: 4 }, say);
+    SCAN = S;
+    if (!S.priced.length) { say("done", S.txN ? `no buys found in the last ${S.txN} transactions. try a deeper scan.` : "no transactions found for this address.", true, !S.txN);
+      $("#receipt").hidden = true; $("#listhd").hidden = true; $("#list").innerHTML = `<div class="empty">nothing to replay yet.</div>`; return; }
+    say("done", "receipt ready", true);
+    render(); startWatch(S);
+    try { history.replaceState(null, "", "?w=" + addr + "#tool"); } catch (e) {}
+  } catch (e) { say("err", friendly(e), false, true); }
+  finally { BUSY = false; $$("#hGo,#tGo").forEach(b => b.disabled = false); if (hintSel === "#heroHint") $("#heroHint").textContent = "read-only. an address, never a key."; }
+}
+$("#hGo").onclick = () => runScan($("#hIn").value, "#heroHint");
+$("#tGo").onclick = () => runScan($("#tIn").value, "#toolHint");
+[["#hIn", "#hGo"], ["#tIn", "#tGo"]].forEach(([i, b]) => $(i).addEventListener("keydown", e => { if (e.key === "Enter") $(b).click(); }));
+$("#trySample").onclick = () => { SCAN = INITS.sample(); $("#scanlog").innerHTML = ""; for (const k in LOG) delete LOG[k];
+  say("s", "sample wallet · synthetic charts · preview", true); render(); $("#tool").scrollIntoView({ behavior: reduce ? "auto" : "smooth" }); };
+$("#toTool").onclick = () => { $("#tool").scrollIntoView({ behavior: reduce ? "auto" : "smooth" }); setTimeout(() => $("#tIn").focus(), 500); };
+
+function render() {
+  SUM = INITS.summarize(SCAN, THR);
+  $("#receipt").hidden = false; $("#listhd").hidden = false;
+  drawCard($("#card"), SUM);
+  const R = SUM;
+  $("#sumline").innerHTML = `<span>gave back <b class="red">${solf(R.given)} SOL</b></span><span>beat inits yourself <b>${solf(-R.cost)} SOL</b></span><span>net with inits <b class="${R.net >= 0 ? "acc" : "red"}">${signed(R.net)} SOL</b></span><span>${R.okN} of ${R.coinN} coins priced · last ${R.txN} tx</span>`;
+  $("#post").hidden = R.sample; $("#say").textContent = R.sample ? "sample receipt · paste a wallet for yours" : "";
+  const text = `I gave back ${solf(R.given)} SOL by not taking my initials at ${R.thr}x.\n\nreceipt by $INITS` + (host() ? `\n${host()}/?w=${R.wallet}` : "");
+  $("#post").href = "https://x.com/intent/post?text=" + encodeURIComponent(text);
+  $("#listT").textContent = `${R.rows.length} coins · biggest first`;
+  $("#list").innerHTML = R.rows.map(r => {
+    const link = R.sample ? `$${esc(r.sym)}` : `<a href="https://dexscreener.com/solana/${r.mint}" target="_blank" rel="noopener">$${esc(r.sym)} ↗</a>`;
+    if (!r.ok) return `<div class="lrow"><i class="dot"></i><div><div class="sym">${link}</div><div class="sub">in ${solf(r.solIn)} SOL</div></div><div class="sub det">no chart found</div><div class="d mut">—</div></div>`;
+    const pos = r.pos, now = pos.open ? `holding at ${mult(r.endMult)}` : `exited at ${mult(r.endMult)}`;
+    const d = r.diff > .0005 ? `<span class="red">−${solf(r.diff)}</span><small>gave back</small>` : r.diff < -.0005 ? `<span class="acc">+${solf(-r.diff)}</span><small>you beat inits</small>` : `<span class="mut">0.00</span><small>${r.triggered ? "same either way" : `never hit ${R.thr}x`}</small>`;
+    const dot = r.diff > .0005 ? "dot red" : r.diff < -.0005 ? "dot on" : "dot";
+    return `<div class="lrow${r === R.worst ? " sel" : ""}"><i class="${dot}"></i><div><div class="sym">${link}</div><div class="sub">in ${solf(r.solIn)} SOL</div></div><div class="sub det">peak ${mult(r.peak)} · ${now}</div><div class="d">${d}</div></div>`;
+  }).join("");
+}
+
+async function drawCard(c, R) {
+  await Promise.all(["400 20px 'JetBrains Mono'", "500 20px 'JetBrains Mono'", "700 20px 'JetBrains Mono'"].map(f => document.fonts.load(f).catch(() => {})));
+  const W = 1200, H = 675, d = 2; c.width = W * d; c.height = H * d;
+  const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.imageSmoothingEnabled = false;
+  const F = (s, w = 400) => `${w} ${s}px "JetBrains Mono", monospace`;
+  x.fillStyle = T.bg; x.fillRect(0, 0, W, H);
+  x.fillStyle = T.ink; x.globalAlpha = .045; for (let yy = 2; yy < H; yy += 5) for (let xx = 2; xx < W; xx += 5) x.fillRect(xx, yy, 1, 1); x.globalAlpha = 1;
+  const g = TK.OBJECTS[CONFIG.object]({ ticker: CONFIG.ticker }), cell = 8;
+  TK.draw(x, g, { theme: T, cell, x: 1010 - g.w * cell / 2, y: (H - g.h * cell) / 2 - 40, shadowLen: 900 });  // object right: its shadow runs off the corner, away from the text
+  const L = 64, Rr = 800;
+  x.font = F(18); x.fillStyle = T.muted; const pr = "anon@inits ~ % "; x.fillText(pr, L, 76);
+  x.fillStyle = T.ink; x.fillText(`inits receipt ${short(R.wallet)}`, L + x.measureText(pr).width, 76);
+  x.font = F(28); x.fillStyle = T.muted; x.fillText("gave back", L, 150);
+  const big = `${solf(R.given)} SOL`; let fs = 124; x.font = F(fs, 700); while (x.measureText(big).width > Rr - L && fs > 60) x.font = F(fs -= 4, 700);
+  x.fillStyle = R.given > .0005 ? T.red : T.accent; x.fillText(big, L - 5, 150 + fs * .96);
+  const y0 = 150 + fs * .96 + 48;
+  x.font = F(25); x.fillStyle = T.ink; x.fillText(R.given > .0005 ? `by not taking initials at ${R.thr}x.` : `clean. nothing given back at ${R.thr}x.`, L, y0);
+  x.fillStyle = T.line; x.globalAlpha = .3; x.fillRect(L, y0 + 30, Rr - L, 2); x.globalAlpha = 1;
+  const w = R.worst;
+  const rows = [[`coins that hit ${R.thr}x on entry`, `${R.hitN} of ${R.okN}`, T.ink], ["round-tripped after that", String(R.rtN), R.rtN ? T.red : T.ink],
+    ["worst ride", w ? `$${w.sym} ${mult(w.peak)} → ${mult(w.endMult)}` : "none", T.ink], ["with inits, net", `${signed(R.net)} SOL`, R.net >= 0 ? T.accent : T.red]];
+  rows.forEach(([k, v, cl], i) => { const y = y0 + 78 + i * 44; x.font = F(22); x.fillStyle = T.muted; x.textAlign = "left"; x.fillText(k, L, y);
+    x.font = F(22, 500); x.fillStyle = cl; x.textAlign = "right"; x.fillText(v, Rr, y); x.textAlign = "left"; });
+  x.font = F(16); x.fillStyle = T.muted; x.fillText(`last ${R.txN} tx · ${R.okN} coins priced · ${new Date().toISOString().slice(0, 10)}`, L, H - 34);
+  x.textAlign = "right"; x.fillStyle = T.ink; x.font = F(17, 600); x.fillText(host() || CONFIG.ticker, W - 64, H - 34); x.textAlign = "left";
+  if (R.sample) { x.font = F(14, 600); const t = "SAMPLE · PREVIEW", tw = x.measureText(t).width + 22; x.strokeStyle = T.red; x.lineWidth = 2; x.strokeRect(W - 64 - tw, 52, tw, 30);
+    x.fillStyle = T.red; x.textAlign = "center"; x.fillText(t, W - 64 - tw / 2, 72); x.textAlign = "left"; }
+}
+const cardBlob = () => new Promise(r => $("#card").toBlob(r, "image/png"));
+$("#dl").onclick = async () => { const b = await cardBlob(), u = URL.createObjectURL(b), a = document.createElement("a");
+  a.href = u; a.download = `inits-receipt-${SUM?.sample ? "sample" : short(SUM?.wallet || "").replace("…", "-")}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); };
+$("#cp").onclick = async () => { try { await navigator.clipboard.write([new ClipboardItem({ "image/png": cardBlob() })]); $("#say").textContent = "copied. paste it into your post."; }
+  catch (e) { $("#say").textContent = "this browser can't copy images. use download."; } };
+
+// ---------- watch: open bags, priced every 15 s ----------
+const WATCH = { bags: [], timer: 0, sound: false, notify: false };
+let AC;
+function beep() { if (!WATCH.sound) return; try { AC ||= new AudioContext(); const o = AC.createOscillator(), g = AC.createGain(); o.type = "square"; o.frequency.value = 880;
+  g.gain.setValueAtTime(.05, AC.currentTime); g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + .3); o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime + .32); } catch (e) {} }
+$("#sndT").onclick = e => { WATCH.sound = !WATCH.sound; e.target.classList.toggle("on", WATCH.sound); if (WATCH.sound) beep(); };
+$("#ntfT").onclick = async e => { if (!("Notification" in window)) { e.target.textContent = "not supported"; return; }
+  const p = await Notification.requestPermission(); WATCH.notify = p === "granted"; e.target.classList.toggle("on", WATCH.notify); };
+function logLine(kind, cls, text, href) {
+  const d = document.createElement("div");
+  d.innerHTML = `<span class="t">${hhmmss()}</span><span class="${cls}">${kind}</span><span>${text}</span>${href ? `<a href="${href}" target="_blank" rel="noopener">chart ↗</a>` : "<a></a>"}`;
+  const log = $("#log"); log.prepend(d); while (log.children.length > 12) log.lastChild.remove();
+}
+function startWatch(S) {
+  clearInterval(WATCH.timer);
+  WATCH.bags = S.priced.filter(r => r.pos.open).map(r => ({ mint: r.mint, sym: r.sym, entry: r.pos.entry, held: r.pos.held, m: null, hit: false }));
+  $("#sB").textContent = WATCH.bags.length; $("#log").innerHTML = "";
+  if (!WATCH.bags.length) { setFeature(`no open bags in this receipt. nothing to watch.`); $("#sC").textContent = "0"; $("#sD").textContent = "0.00"; return; }
+  logLine("watch", "mut", `${WATCH.bags.length} open bag${WATCH.bags.length > 1 ? "s" : ""} from ${short(S.wallet)}`);
+  poll(); WATCH.timer = setInterval(poll, 15000);
+}
+function setFeature(html, wait = true) { const f = $("#feature"); f.classList.toggle("wait", wait); f.innerHTML = html; }
+async function poll() {
+  let px; try { px = await INITS.dexPrices(WATCH.bags.map(b => b.mint)); } catch (e) { $("#lamp").className = "lamp"; $("#lamp").textContent = "prices offline"; return; }
+  $("#lamp").className = "lamp live"; $("#lamp").textContent = "watching";
+  let at = 0, table = 0;
+  for (const b of WATCH.bags) { const p = px[b.mint]; if (!p) continue; const first = b.m == null; b.m = p.price / b.entry; b.url = p.url;
+    if (b.m >= THR) { at++; table += b.held * b.entry; }
+    if (first) logLine("bag", "mut", `$${esc(b.sym)} ${mult(b.m)} · fires at ${THR}x`, b.url);
+    if (b.m >= THR && !b.hit) { b.hit = true; if (!first) { logLine(`${THR}x+`, "acc", `$${esc(b.sym)} ${mult(b.m)} · take your initials`, b.url); beep();
+      if (WATCH.notify) try { new Notification(`$${b.sym} hit ${THR}x`, { body: `take your initials: ${solf(b.held * b.entry)} SOL`, icon: "/fav.png" }); } catch (e) {} } }
+    else if (b.hit && b.m < 1) { b.hit = false; logLine("round", "red", `$${esc(b.sym)} ${mult(b.m)} · back under entry`, b.url); } }
+  $("#sC").textContent = at; $("#sD").innerHTML = `${solf(table)}<small class="mut" style="font-size:.4em;letter-spacing:0"> SOL</small>`;
+  const best = WATCH.bags.filter(b => b.m != null).sort((a, b) => b.m - a.m)[0];
+  if (!best) return setFeature("no live price for these bags right now.");
+  const ready = best.m >= THR;
+  setFeature(`<div><div class="k" style="margin-bottom:12px">${ready ? "ready" : "closest"} · priced ${hhmmss()}</div><div class="big ${ready ? "acc" : ""}">${mult(best.m)}</div></div>
+    <div class="what">$${esc(best.sym)} <span>on your entry</span><br><span class="${ready ? "acc" : ""}">${ready ? `${solf(best.held * best.entry)} SOL of initials sitting there` : `inits fires at ${THR}x`}</span></div>${best.url ? `<a href="${best.url}" target="_blank" rel="noopener">chart ↗</a>` : "<span></span>"}`, false);
+}
+
+// ---------- pump.fun launches, live (free stream, one connection) ----------
+let LAUNCH = 0;
+function setFeed(on) { $("#topDot").className = on ? "dot on" : "dot"; $("#lineDot").className = on ? "dot on" : "dot";
+  if (!on) { $("#topLive").textContent = "pump.fun feed offline"; $("#liveline").textContent = "pump.fun feed offline · retrying"; }
+  if (!WATCH.bags.length) { $("#lamp").className = on ? "lamp live" : "lamp"; $("#lamp").textContent = on ? "live" : "idle"; } }
+function feed() {
+  let ws; try { ws = new WebSocket("wss://pumpportal.fun/api/data"); } catch (e) { return setFeed(false); }
+  ws.onopen = () => { ws.send(JSON.stringify({ method: "subscribeNewToken" })); setFeed(true); $("#liveline").innerHTML = "listening for new pump.fun launches…"; };
+  ws.onmessage = m => { let d; try { d = JSON.parse(m.data); } catch (e) { return; } if (d.txType !== "create") return;
+    LAUNCH++; $("#sA").textContent = LAUNCH; $("#topLive").textContent = `${LAUNCH} launch${LAUNCH === 1 ? "" : "es"} since you got here`;
+    $("#liveline").innerHTML = `<b>${LAUNCH}</b> coin${LAUNCH === 1 ? "" : "s"} launched on pump.fun since you opened this page. every one starts at 1x.`;
+    if (!WATCH.bags.length) logLine("new", "mut", `$${esc(String(d.symbol || "?").slice(0, 12))} · ${(+d.marketCapSol || 0).toFixed(1)} SOL mc`, d.mint ? "https://pump.fun/coin/" + d.mint : ""); };
+  ws.onclose = () => { setFeed(false); setTimeout(feed, 5000); }; ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+feed();
+
+// shared receipt links: ?w=<wallet> opens that wallet's receipt
+{ const w = new URLSearchParams(location.search).get("w"); if (w && INITS.isAddr(w)) { $("#tIn").value = w; setTimeout(() => runScan(w, "#toolHint"), 400); } }
+
+// top bar + active nav
+const secs = $$("section.sess");
+addEventListener("scroll", () => { $("#top").classList.toggle("solid", scrollY > 10);
+  const cur = secs.filter(s => s.getBoundingClientRect().top < innerHeight * .4).pop();
+  $$(".nav a").forEach(a => a.classList.toggle("on", !!cur && a.getAttribute("href") === "#" + cur.id)); }, { passive: true });
+</script>
+</body></html>
