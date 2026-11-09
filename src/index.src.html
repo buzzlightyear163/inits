@@ -399,7 +399,7 @@ function render() {
     const pos = r.pos, now = pos.open ? `holding at ${mult(r.endMult)}` : `exited at ${mult(r.endMult)}`;
     const d = r.diff > .0005 ? `<span class="red">−${solf(r.diff)}</span><small>gave back</small>` : r.diff < -.0005 ? `<span class="acc">+${solf(-r.diff)}</span><small>you beat inits</small>` : `<span class="mut">0.00</span><small>${r.triggered ? "same either way" : `never hit ${R.thr}x`}</small>`;
     const dot = r.diff > .0005 ? "dot red" : r.diff < -.0005 ? "dot on" : "dot";
-    return `<div class="lrow${r === R.worst ? " sel" : ""}"><i class="${dot}"></i><div><div class="sym">${link}</div><div class="sub">in ${solf(r.solIn)} SOL</div></div><div class="sub det">peak ${mult(r.peak)} · ${now}</div><div class="d">${d}</div></div>`;
+    return `<div class="lrow${r === R.worst ? " sel" : ""}"><i class="${dot}"></i><div><div class="sym">${link}</div><div class="sub">in ${solf(r.solIn)} SOL</div></div><div class="sub det">${r.peak > 0 ? `peak ${mult(r.peak)} · ` : ""}${now}</div><div class="d">${d}</div></div>`;
   }).join("");
 }
 

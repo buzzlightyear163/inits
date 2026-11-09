@@ -92,7 +92,7 @@ const INITS = (() => {
 
   // ---------- the replay: every buy is a lot; when the chart touches thr x that lot's price, sell enough to return its SOL ----------
   // Your own sells are mirrored on whatever the inits track still holds. Candles that start before a buy never count for it.
-  function simulate(pos, candles, last, thr = 2) {
+  function simulate(pos, candles, last, thr = 2, sec = 0) {
     const lots = []; let aTok = 0, aOut = 0, iOut = 0, trig = 0, peak = 0;
     const ev = [...pos.trades.map(t => ({ k: 0, t: t.t, tr: t })), ...candles.map(c => ({ k: 1, t: c.s, c }))].sort((a, b) => a.t - b.t || a.k - b.k);
     for (const e of ev) {
@@ -108,7 +108,7 @@ const INITS = (() => {
         }
       } else {
         const c = e.c;
-        if (c.s >= pos.t0 && (pos.t1 == null || c.s <= pos.t1)) peak = Math.max(peak, c.h / pos.entry);
+        if (c.s + sec > pos.t0 && (pos.t1 == null || c.s <= pos.t1)) peak = Math.max(peak, c.h / pos.entry);   // informational: includes the candle the buy landed in
         for (const l of lots) {
           if (l.taken || c.s < l.t || l.tok <= 0) continue;
           if (c.h >= thr * l.price) { const q = Math.min(l.tok, l.orig / thr); l.tok -= q; iOut += q * thr * l.price; l.taken = true; trig++; }
@@ -218,7 +218,7 @@ const INITS = (() => {
   function summarize(S, thr = 2) {
     const rows = S.priced.map(r => {
       if (r.err) return { ...r, ok: false, solIn: r.pos.solIn };
-      return { ...r, ok: true, solIn: r.pos.solIn, ...simulate(r.pos, r.candles, r.pos.open ? r.last : 0, thr) };
+      return { ...r, ok: true, solIn: r.pos.solIn, ...simulate(r.pos, r.candles, r.pos.open ? r.last : 0, thr, r.sec) };
     });
     const ok = rows.filter(r => r.ok), sum = f => ok.reduce((s, r) => s + f(r), 0);
     const given = sum(r => Math.max(0, r.diff)), cost = sum(r => Math.min(0, r.diff));
