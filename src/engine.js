@@ -23,6 +23,15 @@ const INITS = (() => {
       }
     };
   }
+  // newest transaction version the RPC is asked for; raised on the fly if the chain moves past it
+  let MAXV = 1;
+  async function getTx(rpc, sig) {
+    for (let k = 0; k < 3; k++) {
+      try { return await rpc("getTransaction", [sig, { encoding: "json", maxSupportedTransactionVersion: MAXV, commitment: "confirmed" }]); }
+      catch (e) { const m = /Transaction version \((\d+)\)/i.exec(e.message || ""); if (m && +m[1] > MAXV) { MAXV = +m[1]; continue; } throw e; }
+    }
+    return null;
+  }
   async function pool(items, n, fn) {
     let k = 0; const out = new Array(items.length);
     await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (k < items.length) { const j = k++; out[j] = await fn(items[j], j); } }));
@@ -167,19 +176,21 @@ const INITS = (() => {
   async function scan(wallet, o, say = () => {}) {
     const rpc = makeRpc(o.rpc), gt = makeGT(o.gtBase, o.gtGap);
     say("sig", "reading signatures");
-    const sigs = (await rpc("getSignaturesForAddress", [wallet, { limit: Math.min(1000, o.depth) }]) || []).filter(s => !s.err).slice(0, o.depth);
-    say("sig", `${sigs.length} transactions found`, true);
-    if (!sigs.length) return { wallet, depth: o.depth, txN: 0, tradeN: 0, coinN: 0, priced: [] };
-    let done = 0;
+    const raw = (await rpc("getSignaturesForAddress", [wallet, { limit: Math.min(1000, o.depth) }]) || []).slice(0, o.depth);
+    const sigs = raw.filter(s => !s.err), failedN = raw.length - sigs.length;
+    say("sig", `${raw.length} transactions found` + (failedN ? ` · ${failedN} failed on-chain, skipped` : ""), true);
+    if (!sigs.length) return { wallet, depth: o.depth, rawN: raw.length, txN: 0, tradeN: 0, coinN: 0, priced: [] };
+    let done = 0, skipped = 0, lastErr = "";
     const txs = await pool(sigs, o.concurrency || 4, async s => {
-      let tx = null; try { tx = await rpc("getTransaction", [s.signature, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]); } catch (e) { if (e.fatal) throw e; }
-      done++; if (done % 5 === 0 || done === sigs.length) say("tx", `reading transactions ${done}/${sigs.length}`, done === sigs.length);
+      let tx = null; try { tx = await getTx(rpc, s.signature); } catch (e) { skipped++; lastErr = e.message || String(e); }
+      done++; if (done % 5 === 0 || done === sigs.length) say("tx", `reading transactions ${done}/${sigs.length}` + (skipped ? ` · ${skipped} unreadable` : ""), done === sigs.length);
       return tx ? parseTx(tx, wallet, s.signature) : null;
     });
+    if (skipped === sigs.length) throw new Error(lastErr || "couldn't read any transaction");
     const trades = txs.filter(Boolean), pos = positions(trades);
     say("trades", `${trades.length} trades across ${pos.length} coins`, true);
     const top = pos.slice(0, o.maxCoins || 12);
-    if (!top.length) return { wallet, depth: o.depth, txN: sigs.length, tradeN: trades.length, coinN: 0, priced: [] };
+    if (!top.length) return { wallet, depth: o.depth, rawN: raw.length, txN: sigs.length, tradeN: trades.length, coinN: 0, priced: [] };
     say("px", "looking up charts");
     let info = {};
     try { info = await tokenInfo(gt, top.map(p => p.mint)); } catch (e) { say("px", "chart data unreachable: " + e.message, true, true); }
@@ -200,7 +211,7 @@ const INITS = (() => {
       if (!row.candles.length) row.err ||= "no chart";
       priced.push(row);
     }
-    return { wallet, depth: o.depth, txN: sigs.length, tradeN: trades.length, coinN: pos.length, priced, at: now };
+    return { wallet, depth: o.depth, rawN: raw.length, txN: sigs.length, tradeN: trades.length, coinN: pos.length, priced, at: now };
   }
 
   // ---------- scan -> receipt numbers (re-run instantly for another trigger) ----------

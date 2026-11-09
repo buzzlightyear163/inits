@@ -368,7 +368,7 @@ async function runScan(addr, hintSel) {
   try {
     const S = await INITS.scan(addr, { rpc: CONFIG.rpc, depth: DEPTH, maxCoins: CONFIG.maxCoins, concurrency: 4 }, say);
     SCAN = S;
-    if (!S.priced.length) { say("done", S.txN ? `no buys found in the last ${S.txN} transactions. try a deeper scan.` : "no transactions found for this address.", true, !S.txN);
+    if (!S.priced.length) { say("done", S.txN ? `no buys found in the last ${S.txN} transactions. try a deeper scan.` : S.rawN ? `all ${S.rawN} transactions failed on-chain. nothing to replay.` : "no transactions found for this address.", true, !S.txN);
       $("#receipt").hidden = true; $("#listhd").hidden = true; $("#list").innerHTML = `<div class="empty">nothing to replay yet.</div>`; return; }
     say("done", "receipt ready", true);
     render(); startWatch(S);
