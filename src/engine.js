@@ -123,14 +123,14 @@ const INITS = (() => {
   // ---------- GeckoTerminal (public, ~30 calls/min: one call at a time, spaced) ----------
   const TFS = [["minute", 1, 60], ["minute", 5, 300], ["minute", 15, 900], ["hour", 1, 3600], ["hour", 4, 14400], ["hour", 12, 43200], ["day", 1, 86400]];
   const pickTF = span => TFS.find(([, , s]) => span / s <= 980) || TFS[TFS.length - 1];
-  function makeGT(base = "https://api.geckoterminal.com/api/v2", gapMs = 2100) {
+  function makeGT(base = "https://api.geckoterminal.com/api/v2", gapMs = 2600) {
     let last = 0;
     async function get(path, tries = 0) {
       const wait = Math.max(0, last + gapMs - Date.now()); if (wait) await sleep(wait); last = Date.now();
       let r;
       try { r = await fetch(base + path, { headers: { accept: "application/json" } }); }
-      catch (e) { if (tries < 2) { await sleep(1500); return get(path, tries + 1); } throw e; }
-      if (r.status === 429) { if (tries < 3) { await sleep(12000); return get(path, tries + 1); } throw new Error("chart data is rate limited, try again in a minute"); }
+      catch (e) { if (tries < 3) { await sleep(7000 * (tries + 1)); return get(path, tries + 1); } throw new Error("chart data unreachable"); }   // a rate-limited reply has no CORS header, so it surfaces as a network error
+      if (r.status === 429) { if (tries < 3) { await sleep(10000 * (tries + 1)); return get(path, tries + 1); } throw new Error("chart data is rate limited, try again in a minute"); }
       if (r.status === 404) return null;
       if (!r.ok) throw new Error("chart data " + r.status);
       return r.json();
