@@ -157,11 +157,21 @@ const INITS = (() => {
     }
     return info;
   }
+  const DEAD = new Set();   // addresses that are not pools (404): never ask twice
   async function candlesFor(gt, poolAddr, mint, from, to) {
     const [tf, agg, sec] = pickTF(Math.max(120, to - from));
+    if (DEAD.has(poolAddr)) return { sec, list: [] };
     const j = await gt.get(`/networks/solana/pools/${poolAddr}/ohlcv/${tf}?aggregate=${agg}&before_timestamp=${Math.ceil(to + sec)}&limit=1000&currency=token&token=${mint}`);
-    const list = (j?.data?.attributes?.ohlcv_list || []).map(([s, o, h, l, c]) => ({ s, h: +h, c: +c })).filter(c => c.s + sec >= from && c.h > 0);
+    if (!j) { DEAD.add(poolAddr); return { sec, list: [] }; }
+    // prices come in the pool's other token: only SOL pools count
+    const m = j.meta || {}, other = m.base?.address === mint ? m.quote : m.quote?.address === mint ? m.base : null;
+    if (other && other.address !== WSOL) return { sec, list: [], notSol: other.symbol || "?" };
+    const list = (j?.data?.attributes?.ohlcv_list || []).map(([s, o, h, l, c]) => ({ s, o: +o, h: +h, c: +c })).filter(c => c.s + sec >= from && c.h > 0);
     return { sec, list: list.sort((a, b) => a.s - b.s) };
+  }
+  // sanity: a wick can't be more than 4x the candle's body or the close before it (bad prints happen)
+  function clean(list) {
+    return list.map((c, i) => { const ref = Math.max(c.o || c.c, c.c, i ? list[i - 1].c : c.c); return { ...c, h: Math.min(c.h, ref * 4) }; });
   }
 
   // ---------- DexScreener (public): live price in SOL for open bags ----------
@@ -212,16 +222,20 @@ const INITS = (() => {
         for (const addr of cands) {
           tried.add(addr);
           const c = await candlesFor(gt, addr, p.mint, p.t0, to);
+          if (c.notSol) row.notSol = c.notSol;
           if (c.list.length) { if (!row.candles.length) row.sec = c.sec; row.candles = row.candles.concat(c.list); }
           const first = row.candles.length ? Math.min(...row.candles.map(x => x.s)) : Infinity;
           const startOK = first <= p.t0 + row.sec;                                      // covers the first buy
           const endOK = !p.open || tops.includes(addr) || !tops.some(a => !tried.has(a)); // open bag: also want the live pool
           if (startOK && endOK) break;
         }
-        row.candles.sort((a, b) => a.s - b.s);
+        row.candles = clean(row.candles.sort((a, b) => a.s - b.s));
+        // units check: the chart near the first buy must be close to what the wallet actually paid
+        if (row.candles.length) { const near = row.candles.reduce((a, c) => Math.abs(c.s - p.t0) < Math.abs(a.s - p.t0) ? c : a), k = near.c / p.entry;
+          if (!(k > .05 && k < 20)) { row.candles = []; row.err = "chart in another unit"; } }
         row.last = row.candles.length ? row.candles[row.candles.length - 1].c : 0;
       } catch (e) { row.err = e.message; }
-      if (!row.candles.length) row.err ||= "no chart";
+      if (!row.candles.length) row.err ||= row.notSol ? `paired with $${row.notSol}, not SOL` : "no chart";
       priced.push(row);
     }
     return { wallet, depth: o.depth, rawN: raw.length, txN: sigs.length, tradeN: trades.length, coinN: pos.length, priced, at: now };

@@ -6,8 +6,8 @@
 <meta name="description" content="Sells your initials at 2x on everything you buy, so you never round-trip again. Paste a wallet to see how much SOL you gave back.">
 <meta name="theme-color" content="#0f241a">
 <meta property="og:title" content="INITS — takes your initials. every time."><meta property="og:description" content="Paste a wallet. See how much SOL you gave back by not taking your initials at 2x.">
-<meta property="og:type" content="website"><meta property="og:image" content="/og.png">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="/og.png">
+<meta property="og:type" content="website"><meta property="og:url" content="https://www.takeinits.fun/"><meta property="og:image" content="https://www.takeinits.fun/og.png">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="INITS — takes your initials. every time."><meta name="twitter:description" content="Paste a wallet. See how much SOL you gave back by not taking your initials at 2x."><meta name="twitter:image" content="https://www.takeinits.fun/og.png">
 <link rel="icon" href="/fav.png"><link rel="apple-touch-icon" href="/fav.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -761,11 +761,21 @@ const INITS = (() => {
     }
     return info;
   }
+  const DEAD = new Set();   // addresses that are not pools (404): never ask twice
   async function candlesFor(gt, poolAddr, mint, from, to) {
     const [tf, agg, sec] = pickTF(Math.max(120, to - from));
+    if (DEAD.has(poolAddr)) return { sec, list: [] };
     const j = await gt.get(`/networks/solana/pools/${poolAddr}/ohlcv/${tf}?aggregate=${agg}&before_timestamp=${Math.ceil(to + sec)}&limit=1000&currency=token&token=${mint}`);
-    const list = (j?.data?.attributes?.ohlcv_list || []).map(([s, o, h, l, c]) => ({ s, h: +h, c: +c })).filter(c => c.s + sec >= from && c.h > 0);
+    if (!j) { DEAD.add(poolAddr); return { sec, list: [] }; }
+    // prices come in the pool's other token: only SOL pools count
+    const m = j.meta || {}, other = m.base?.address === mint ? m.quote : m.quote?.address === mint ? m.base : null;
+    if (other && other.address !== WSOL) return { sec, list: [], notSol: other.symbol || "?" };
+    const list = (j?.data?.attributes?.ohlcv_list || []).map(([s, o, h, l, c]) => ({ s, o: +o, h: +h, c: +c })).filter(c => c.s + sec >= from && c.h > 0);
     return { sec, list: list.sort((a, b) => a.s - b.s) };
+  }
+  // sanity: a wick can't be more than 4x the candle's body or the close before it (bad prints happen)
+  function clean(list) {
+    return list.map((c, i) => { const ref = Math.max(c.o || c.c, c.c, i ? list[i - 1].c : c.c); return { ...c, h: Math.min(c.h, ref * 4) }; });
   }
 
   // ---------- DexScreener (public): live price in SOL for open bags ----------
@@ -816,16 +826,20 @@ const INITS = (() => {
         for (const addr of cands) {
           tried.add(addr);
           const c = await candlesFor(gt, addr, p.mint, p.t0, to);
+          if (c.notSol) row.notSol = c.notSol;
           if (c.list.length) { if (!row.candles.length) row.sec = c.sec; row.candles = row.candles.concat(c.list); }
           const first = row.candles.length ? Math.min(...row.candles.map(x => x.s)) : Infinity;
           const startOK = first <= p.t0 + row.sec;                                      // covers the first buy
           const endOK = !p.open || tops.includes(addr) || !tops.some(a => !tried.has(a)); // open bag: also want the live pool
           if (startOK && endOK) break;
         }
-        row.candles.sort((a, b) => a.s - b.s);
+        row.candles = clean(row.candles.sort((a, b) => a.s - b.s));
+        // units check: the chart near the first buy must be close to what the wallet actually paid
+        if (row.candles.length) { const near = row.candles.reduce((a, c) => Math.abs(c.s - p.t0) < Math.abs(a.s - p.t0) ? c : a), k = near.c / p.entry;
+          if (!(k > .05 && k < 20)) { row.candles = []; row.err = "chart in another unit"; } }
         row.last = row.candles.length ? row.candles[row.candles.length - 1].c : 0;
       } catch (e) { row.err = e.message; }
-      if (!row.candles.length) row.err ||= "no chart";
+      if (!row.candles.length) row.err ||= row.notSol ? `paired with $${row.notSol}, not SOL` : "no chart";
       priced.push(row);
     }
     return { wallet, depth: o.depth, rawN: raw.length, txN: sigs.length, tradeN: trades.length, coinN: pos.length, priced, at: now };
@@ -873,7 +887,7 @@ if (typeof module !== "undefined") module.exports = INITS;
 </script>
 <script>
 const CONFIG = {
-  ca: "", x: "https://x.com/", site: "", ticker: "$INITS", object: "split", theme: document.documentElement.dataset.theme,
+  ca: "Z6F1YAtCE183TsHM23MAsYPgwmtpqJXzgmdYYfZpump", x: "https://x.com/", site: "https://www.takeinits.fun", ticker: "$INITS", object: "split", theme: document.documentElement.dataset.theme,
   rpc: ["https://solana-rpc.publicnode.com", "https://api.mainnet-beta.solana.com"], maxCoins: 12,
 };
 const T = TK.THEMES[CONFIG.theme], reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -885,7 +899,7 @@ const solf = n => { const a = Math.abs(n); return a.toFixed(a > 0 && a < .01 ? 3
 const signed = n => (n > 0.0005 ? "+" : n < -0.0005 ? "−" : "") + solf(n);
 const mult = n => (n >= 10 ? n.toFixed(0) : n.toFixed(1)) + "x";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const host = () => (CONFIG.site || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+const host = () => (CONFIG.site || "").replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
 
 if (CONFIG.ca) { $("#ca").textContent = CONFIG.ca; $("#copy").hidden = false; $("#cafoot").textContent = "ca " + CONFIG.ca;
   $("#copy").onclick = () => navigator.clipboard.writeText(CONFIG.ca).then(() => $("#copy").textContent = "copied").catch(() => {});
@@ -1011,7 +1025,7 @@ function render() {
   $("#listT").textContent = `${R.rows.length} coins · biggest first`;
   $("#list").innerHTML = R.rows.map(r => {
     const link = R.sample ? `$${esc(r.sym)}` : `<a href="https://dexscreener.com/solana/${r.mint}" target="_blank" rel="noopener">$${esc(r.sym)} ↗</a>`;
-    if (!r.ok) return `<div class="lrow"><i class="dot"></i><div><div class="sym">${link}</div><div class="sub">in ${solf(r.solIn)} SOL</div></div><div class="sub det">no chart found</div><div class="d mut">—</div></div>`;
+    if (!r.ok) return `<div class="lrow"><i class="dot"></i><div><div class="sym">${link}</div><div class="sub">in ${solf(r.solIn)} SOL</div></div><div class="sub det">${esc(r.err === "no chart" ? "no SOL chart found" : r.err)}</div><div class="d mut">—</div></div>`;
     const pos = r.pos, now = pos.open ? `holding at ${mult(r.endMult)}` : `exited at ${mult(r.endMult)}`;
     const d = r.diff > .0005 ? `<span class="red">−${solf(r.diff)}</span><small>gave back</small>` : r.diff < -.0005 ? `<span class="acc">+${solf(-r.diff)}</span><small>you beat inits</small>` : `<span class="mut">0.00</span><small>${r.triggered ? "same either way" : `never hit ${R.thr}x`}</small>`;
     const dot = r.diff > .0005 ? "dot red" : r.diff < -.0005 ? "dot on" : "dot";

@@ -8,9 +8,9 @@ At the top of the last `<script>` in `index.html`:
 
 ```js
 const CONFIG = {
-  ca: "",                  // contract address. Empty = "posted here and on X at launch", buy button says "live at launch"
+  ca: "Z6F1YAtCE183TsHM23MAsYPgwmtpqJXzgmdYYfZpump",  // contract address (set)
   x: "https://x.com/",     // the project's X account
-  site: "",                // e.g. "https://inits.fun". Shows on every receipt card and in the "post on X" text,
+  site: "https://www.takeinits.fun",  // shows on every receipt card and in the "post on X" text, with a ?w=<wallet> link
                            // with a ?w=<wallet> link that opens that wallet's receipt
   ...
 };
