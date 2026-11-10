@@ -13,9 +13,9 @@ const INITS = (() => {
       const url = urls[i % urls.length];
       try {
         const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-        if (r.status === 429 || r.status >= 500) throw new Error("busy " + r.status);
+        if (r.status === 429 || r.status === 403 || r.status >= 500) throw new Error("busy " + r.status);
         const j = await r.json();
-        if (j.error) { const e = new Error(j.error.message || "rpc error"); if (!/limit|busy|timeout|429|too many/i.test(e.message)) e.fatal = true; throw e; }
+        if (j.error) { const e = new Error(j.error.message || "rpc error"); if (!/limit|busy|timeout|429|too many|forbidden|403/i.test(e.message)) e.fatal = true; throw e; }
         return j.result;
       } catch (e) {
         if (e.fatal || tries >= 6) throw e;

@@ -8,7 +8,7 @@ At the top of the last `<script>` in `index.html`:
 
 ```js
 const CONFIG = {
-  ca: "Z6F1YAtCE183TsHM23MAsYPgwmtpqJXzgmdYYfZpump",  // contract address (set)
+  ca: "DZiNSWQi6GKERWMi7WGY5kNPykMQXHb6nmpc5C7JdGrQ",  // contract address (set). Buy buttons: pump.fun for a ...pump CA, Jupiter otherwise
   x: "https://x.com/",     // the project's X account
   site: "https://www.takeinits.fun",  // shows on every receipt card and in the "post on X" text, with a ?w=<wallet> link
                            // with a ?w=<wallet> link that opens that wallet's receipt

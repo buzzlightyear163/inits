@@ -617,9 +617,9 @@ const INITS = (() => {
       const url = urls[i % urls.length];
       try {
         const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-        if (r.status === 429 || r.status >= 500) throw new Error("busy " + r.status);
+        if (r.status === 429 || r.status === 403 || r.status >= 500) throw new Error("busy " + r.status);
         const j = await r.json();
-        if (j.error) { const e = new Error(j.error.message || "rpc error"); if (!/limit|busy|timeout|429|too many/i.test(e.message)) e.fatal = true; throw e; }
+        if (j.error) { const e = new Error(j.error.message || "rpc error"); if (!/limit|busy|timeout|429|too many|forbidden|403/i.test(e.message)) e.fatal = true; throw e; }
         return j.result;
       } catch (e) {
         if (e.fatal || tries >= 6) throw e;
@@ -887,7 +887,7 @@ if (typeof module !== "undefined") module.exports = INITS;
 </script>
 <script>
 const CONFIG = {
-  ca: "Z6F1YAtCE183TsHM23MAsYPgwmtpqJXzgmdYYfZpump", x: "https://x.com/", site: "https://www.takeinits.fun", ticker: "$INITS", object: "split", theme: document.documentElement.dataset.theme,
+  ca: "DZiNSWQi6GKERWMi7WGY5kNPykMQXHb6nmpc5C7JdGrQ", x: "https://x.com/", site: "https://www.takeinits.fun", ticker: "$INITS", object: "split", theme: document.documentElement.dataset.theme,
   rpc: ["https://solana-rpc.publicnode.com", "https://api.mainnet-beta.solana.com"], maxCoins: 12,
 };
 const T = TK.THEMES[CONFIG.theme], reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -903,7 +903,9 @@ const host = () => (CONFIG.site || "").replace(/^https?:\/\//, "").replace(/^www
 
 if (CONFIG.ca) { $("#ca").textContent = CONFIG.ca; $("#copy").hidden = false; $("#cafoot").textContent = "ca " + CONFIG.ca;
   $("#copy").onclick = () => navigator.clipboard.writeText(CONFIG.ca).then(() => $("#copy").textContent = "copied").catch(() => {});
-  ["#buy", "#buyTop"].forEach(s => $(s).href = "https://pump.fun/coin/" + CONFIG.ca); }
+  const pumpCA = /pump$/.test(CONFIG.ca), buyURL = pumpCA ? "https://pump.fun/coin/" + CONFIG.ca : "https://jup.ag/swap/SOL-" + CONFIG.ca;
+  ["#buy", "#buyTop"].forEach(s => { $(s).href = buyURL; $(s).target = "_blank"; $(s).rel = "noopener"; });
+  if (!pumpCA) $("#buy").textContent = "buy $INITS"; }
 else { $("#buy").removeAttribute("href"); $("#buy").textContent = "live at launch"; $("#buy").style.opacity = .6; }
 $("#xlink").href = CONFIG.x;
 
