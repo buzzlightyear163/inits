@@ -124,7 +124,7 @@ footer.f2 .fine{display:flex;gap:24px;flex-wrap:wrap;margin-top:60px;font-size:1
 <header class="top" id="top"><div class="wrap">
   <a class="brand" href="#hero"><canvas id="logo"></canvas>inits</a>
   <nav class="nav"><a href="#story">how</a><a href="#tool">receipt</a><a href="#live">watch</a><a href="#token">token</a><a href="#faq">faq</a></nav>
-  <span class="live"><i class="dot" id="topDot"></i><span id="topLive">connecting to pump.fun</span></span>
+  <span class="live"><i class="dot" id="topDot"></i><span id="topLive">connecting to launchlab</span></span>
   <a class="btn" id="buyTop" href="#token">buy</a>
 </div></header>
 
@@ -138,7 +138,7 @@ footer.f2 .fine{display:flex;gap:24px;flex-wrap:wrap;margin-top:60px;font-size:1
       <div class="inbar"><input id="hIn" placeholder="paste a wallet address" autocomplete="off" spellcheck="false" aria-label="wallet address"><button id="hGo">▶ <span>receipt</span></button></div>
       <div class="hint" id="heroHint">read-only. an address, never a key.</div>
       <div class="try"><span>or</span><button class="chip" id="trySample">see a sample receipt<small>preview</small></button></div>
-      <div class="liveline"><i class="dot" id="lineDot"></i><span id="liveline">connecting to the pump.fun feed…</span></div>
+      <div class="liveline"><i class="dot" id="lineDot"></i><span id="liveline">connecting to the Raydium LaunchLab feed…</span></div>
     </div>
     <div class="vis" id="heroVis" style="height:520px"></div>
   </div>
@@ -201,12 +201,12 @@ footer.f2 .fine{display:flex;gap:24px;flex-wrap:wrap;margin-top:60px;font-size:1
   </div>
   <div class="out">
     <div class="bigstats">
-      <div><div class="k">pump.fun launches</div><div class="v" id="sA">0</div></div>
+      <div><div class="k">launchlab launches</div><div class="v" id="sA">0</div></div>
       <div><div class="k">your open bags</div><div class="v" id="sB">–</div></div>
       <div><div class="k">at 2x or more</div><div class="v acc" id="sC">–</div></div>
       <div><div class="k">initials on table</div><div class="v" id="sD">–</div></div>
     </div>
-    <div class="feature wait" id="feature">get a receipt above and your open bags land here.<br>until then: every coin launched on pump.fun since you opened this page.</div>
+    <div class="feature wait" id="feature">get a receipt above and your open bags land here.<br>until then: every coin launched on Raydium LaunchLab since you opened this page.</div>
     <div class="log" id="log"></div>
   </div>
 </div></section>
@@ -217,14 +217,14 @@ footer.f2 .fine{display:flex;gap:24px;flex-wrap:wrap;margin-top:60px;font-size:1
     <div class="cmd">anon@inits ~ % <b>inits token</b></div>
     <h2>fees keep it honest.</h2>
     <p>Creator fees pay for the data and the sell engine. Every SOL of fees splits the same way.</p>
-    <div class="ctl"><div class="ctas" style="margin-top:0"><a class="btn pri" id="buy" href="#">buy on pump.fun</a><a class="btn" id="xlink" href="#">follow on X</a></div></div>
+    <div class="ctl"><div class="ctas" style="margin-top:0"><a class="btn pri" id="buy" href="#">buy on raydium</a><a class="btn" id="xlink" href="#">follow on X</a></div></div>
   </div>
   <div class="out">
     <div class="split"><div style="flex:50;--c:var(--accent)"></div><div style="flex:40;--c:var(--red)"></div><div style="flex:10;--c:var(--faint)"></div></div>
     <div class="rows"><div><b class="acc">50%</b>rpc, chart data and the sell engine</div><div><b class="red">40%</b>buyback + burn $INITS</div><div><b>10%</b>dev</div></div>
     <div class="facts">
       <div><div class="k">ticker</div><div class="v">$INITS</div></div><div><div class="k">chain</div><div class="v">solana</div></div>
-      <div><div class="k">launch</div><div class="v">pump.fun</div></div><div><div class="k">trigger</div><div class="v acc">2x</div></div>
+      <div><div class="k">launch</div><div class="v">raydium launchlab</div></div><div><div class="k">trigger</div><div class="v acc">2x</div></div>
     </div>
     <div class="callout"><p>INITS never touches a key. <span>Receipts read public chain data, the watch reads public prices. Paste an address, never a seed.</span></p><button class="btn pri" id="toTool">get your receipt</button></div>
   </div>
@@ -273,9 +273,8 @@ const host = () => (CONFIG.site || "").replace(/^https?:\/\//, "").replace(/^www
 
 if (CONFIG.ca) { $("#ca").textContent = CONFIG.ca; $("#copy").hidden = false; $("#cafoot").textContent = "ca " + CONFIG.ca;
   $("#copy").onclick = () => navigator.clipboard.writeText(CONFIG.ca).then(() => $("#copy").textContent = "copied").catch(() => {});
-  const pumpCA = /pump$/.test(CONFIG.ca), buyURL = pumpCA ? "https://pump.fun/coin/" + CONFIG.ca : "https://jup.ag/swap/SOL-" + CONFIG.ca;
-  ["#buy", "#buyTop"].forEach(s => { $(s).href = buyURL; $(s).target = "_blank"; $(s).rel = "noopener"; });
-  if (!pumpCA) $("#buy").textContent = "buy $INITS"; }
+  const buyURL = "https://raydium.io/launchpad/token/?mint=" + CONFIG.ca;   // launched on Raydium LaunchLab
+  ["#buy", "#buyTop"].forEach(s => { $(s).href = buyURL; $(s).target = "_blank"; $(s).rel = "noopener"; }); }
 else { $("#buy").removeAttribute("href"); $("#buy").textContent = "live at launch"; $("#buy").style.opacity = .6; }
 $("#xlink").href = CONFIG.x;
 
@@ -447,9 +446,9 @@ function beep() { if (!WATCH.sound) return; try { AC ||= new AudioContext(); con
 $("#sndT").onclick = e => { WATCH.sound = !WATCH.sound; e.target.classList.toggle("on", WATCH.sound); if (WATCH.sound) beep(); };
 $("#ntfT").onclick = async e => { if (!("Notification" in window)) { e.target.textContent = "not supported"; return; }
   const p = await Notification.requestPermission(); WATCH.notify = p === "granted"; e.target.classList.toggle("on", WATCH.notify); };
-function logLine(kind, cls, text, href) {
+function logLine(kind, cls, text, href, label = "chart ↗") {
   const d = document.createElement("div");
-  d.innerHTML = `<span class="t">${hhmmss()}</span><span class="${cls}">${kind}</span><span>${text}</span>${href ? `<a href="${href}" target="_blank" rel="noopener">chart ↗</a>` : "<a></a>"}`;
+  d.innerHTML = `<span class="t">${hhmmss()}</span><span class="${cls}">${kind}</span><span>${text}</span>${href ? `<a href="${href}" target="_blank" rel="noopener">${label}</a>` : "<a></a>"}`;
   const log = $("#log"); log.prepend(d); while (log.children.length > 12) log.lastChild.remove();
 }
 function startWatch(S) {
@@ -479,18 +478,31 @@ async function poll() {
     <div class="what">$${esc(best.sym)} <span>on your entry</span><br><span class="${ready ? "acc" : ""}">${ready ? `${solf(best.held * best.entry)} SOL of initials sitting there` : `inits fires at ${THR}x`}</span></div>${best.url ? `<a href="${best.url}" target="_blank" rel="noopener">chart ↗</a>` : "<span></span>"}`, false);
 }
 
-// ---------- pump.fun launches, live (free stream, one connection) ----------
-let LAUNCH = 0;
+// ---------- Raydium LaunchLab launches, live (public RPC websocket, one connection) ----------
+const LAUNCHLAB = "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj", CREATE_EVENT = "97d7e20976a173ae";
+let LAUNCH = 0; const SEEN = new Set();
+function launchMeta(logs) { // PoolCreateEvent: disc(8) pool(32) creator(32) config(32) decimals(1) name symbol uri
+  for (const l of logs) { if (!l.startsWith("Program data: ")) continue;
+    let b; try { b = Uint8Array.from(atob(l.slice(14)), c => c.charCodeAt(0)); } catch (e) { continue; }
+    if (b.length < 120 || Array.from(b.slice(0, 8)).map(x => x.toString(16).padStart(2, "0")).join("") !== CREATE_EVENT) continue;
+    const dv = new DataView(b.buffer); let o = 105;
+    const str = max => { if (o + 4 > b.length) return null; const n = dv.getUint32(o, true); o += 4; if (!n || n > max || o + n > b.length) return null; const t = new TextDecoder().decode(b.slice(o, o + n)); o += n; return t; };
+    const name = str(64), symbol = name && str(24); if (symbol) return { name, symbol }; }
+  return null; }
 function setFeed(on) { $("#topDot").className = on ? "dot on" : "dot"; $("#lineDot").className = on ? "dot on" : "dot";
-  if (!on) { $("#topLive").textContent = "pump.fun feed offline"; $("#liveline").textContent = "pump.fun feed offline · retrying"; }
+  if (!on) { $("#topLive").textContent = "launch feed offline"; $("#liveline").textContent = "launchlab feed offline · retrying"; }
   if (!WATCH.bags.length) { $("#lamp").className = on ? "lamp live" : "lamp"; $("#lamp").textContent = on ? "live" : "idle"; } }
 function feed() {
-  let ws; try { ws = new WebSocket("wss://pumpportal.fun/api/data"); } catch (e) { return setFeed(false); }
-  ws.onopen = () => { ws.send(JSON.stringify({ method: "subscribeNewToken" })); setFeed(true); $("#liveline").innerHTML = "listening for new pump.fun launches…"; };
-  ws.onmessage = m => { let d; try { d = JSON.parse(m.data); } catch (e) { return; } if (d.txType !== "create") return;
-    LAUNCH++; $("#sA").textContent = LAUNCH; $("#topLive").textContent = `${LAUNCH} launch${LAUNCH === 1 ? "" : "es"} since you got here`;
-    $("#liveline").innerHTML = `<b>${LAUNCH}</b> coin${LAUNCH === 1 ? "" : "s"} launched on pump.fun since you opened this page. every one starts at 1x.`;
-    if (!WATCH.bags.length) logLine("new", "mut", `$${esc(String(d.symbol || "?").slice(0, 12))} · ${(+d.marketCapSol || 0).toFixed(1)} SOL mc`, d.mint ? "https://pump.fun/coin/" + d.mint : ""); };
+  let ws; try { ws = new WebSocket("wss://solana-rpc.publicnode.com"); } catch (e) { return setFeed(false); }
+  ws.onopen = () => ws.send(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "logsSubscribe", params: [{ mentions: [LAUNCHLAB] }, { commitment: "confirmed" }] }));
+  ws.onmessage = m => { let d; try { d = JSON.parse(m.data); } catch (e) { return; }
+    if (d.id === 1) { setFeed(!!d.result); if (d.result) $("#liveline").innerHTML = "listening for new Raydium LaunchLab launches…"; return; }
+    const v = d.params?.result?.value; if (!v || v.err || SEEN.has(v.signature)) return;
+    if (!(v.logs || []).some(l => /Instruction: Initialize(V2|WithToken2022)?$/.test(l))) return;
+    SEEN.add(v.signature); LAUNCH++; const meta = launchMeta(v.logs);
+    $("#sA").textContent = LAUNCH; $("#topLive").textContent = `${LAUNCH} launch${LAUNCH === 1 ? "" : "es"} since you got here`;
+    $("#liveline").innerHTML = `<b>${LAUNCH}</b> coin${LAUNCH === 1 ? "" : "s"} launched on Raydium LaunchLab since you opened this page. every one starts at 1x.`;
+    if (!WATCH.bags.length) logLine("new", "mut", `$${esc(String(meta?.symbol || "?").slice(0, 12))} · launchlab`, "https://solscan.io/tx/" + v.signature, "tx ↗"); };
   ws.onclose = () => { setFeed(false); setTimeout(feed, 5000); }; ws.onerror = () => { try { ws.close(); } catch (e) {} };
 }
 feed();

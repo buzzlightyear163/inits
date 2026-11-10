@@ -8,7 +8,7 @@ At the top of the last `<script>` in `index.html`:
 
 ```js
 const CONFIG = {
-  ca: "DZiNSWQi6GKERWMi7WGY5kNPykMQXHb6nmpc5C7JdGrQ",  // contract address (set). Buy buttons: pump.fun for a ...pump CA, Jupiter otherwise
+  ca: "DZiNSWQi6GKERWMi7WGY5kNPykMQXHb6nmpc5C7JdGrQ",  // contract address (set). Buy buttons go to its Raydium LaunchLab page
   x: "https://x.com/",     // the project's X account
   site: "https://www.takeinits.fun",  // shows on every receipt card and in the "post on X" text, with a ?w=<wallet> link
                            // with a ?w=<wallet> link that opens that wallet's receipt
@@ -22,7 +22,7 @@ const CONFIG = {
 |---|---|---|
 | Receipt (scan + replay + card) | public Solana RPC (publicnode, fallback mainnet-beta), GeckoTerminal candles | live, no keys |
 | 2x watch on open bags | DexScreener prices every 15 s, sound and browser notification | live, no keys |
-| Launch counter + log | PumpPortal free stream (`subscribeNewToken`) | live, no keys |
+| Launch counter + log | Raydium LaunchLab launches via public RPC websocket (`logsSubscribe`) | live, no keys |
 | Auto-sell engine | — | preview, labeled on the site |
 | Sample receipt | synthetic charts | labeled SAMPLE · PREVIEW |
 
@@ -36,7 +36,7 @@ GitHub → Vercel, Framework: Other, no build command, output = the folder with 
 
 - Fonts: JetBrains Mono loads (headline and the receipt card).
 - X preview: paste the URL into a post draft, `og.png` should show.
-- Live data: the top bar should count pump.fun launches within seconds. Run a receipt on a wallet you know. GeckoTerminal allows ~30 calls/min, so a 12-coin receipt takes about 30 s; that's expected.
+- Live data: the top bar should count Raydium LaunchLab launches within a minute or two. Run a receipt on a wallet you know. GeckoTerminal allows ~30 calls/min, so a 12-coin receipt takes about 30 s; that's expected.
 - If publicnode rate-limits under load, put a free RPC from Helius/QuickNode first in `CONFIG.rpc` (needs a key in the URL, so keep it domain-locked).
 
 ## Editing
