@@ -8,7 +8,7 @@ At the top of the last `<script>` in `index.html`:
 
 ```js
 const CONFIG = {
-  ca: "DZiNSWQi6GKERWMi7WGY5kNPykMQXHb6nmpc5C7JdGrQ",  // contract address (set). Buy buttons go to its Raydium LaunchLab page
+  ca: "FKrXcZu2emRnaGiG1cVZJLg8MFRR3gvRrPKrd3NR9GyY",  // contract address (set). Buy buttons go to its Raydium LaunchLab page
   x: "https://x.com/",     // the project's X account
   site: "https://www.takeinits.fun",  // shows on every receipt card and in the "post on X" text, with a ?w=<wallet> link
                            // with a ?w=<wallet> link that opens that wallet's receipt
